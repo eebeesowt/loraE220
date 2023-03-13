@@ -209,6 +209,8 @@ class E220LoRa:
                     print("Transmission Method   :", transMeth)
                     print("LBT Enable            :", lbtEnable)
                     print("WOR Cycle             :", worCycl)
+            else:
+                print("module not response")
 
     def setModulSpeedParam(self, uartSpeed, SerialParBit, AirDataRate):
         self.setConfigMode()
@@ -256,7 +258,6 @@ class E220LoRa:
                     print("set modul CONFIG param done!")
 
     def sendP2P(self,targetAdressHigh, targetAdressLow , targetChan , msg ):
-        global pix
         self.setNormalMode()
         cmd = []
         cmd.append(targetAdressHigh)
@@ -268,31 +269,46 @@ class E220LoRa:
             cmd.append(ord(message[i]))
         self.sendMSG(bytes(cmd))
         self.wait(200)
-        pix.fill((0,0,25))
 
     def sendBroadcast(self , targetChan , msg ):
-        global pix
         self.setNormalMode()
         cmd = []
         cmd.append(255)
         cmd.append(255)
         cmd.append(targetChan)
-        message = json.dumps(msg)
-        for i in range(len(message)):
-            cmd.append(ord(message[i]))
+        spec_msg = [len(msg) + 5,msg]
+        print("specmsg =",spec_msg)
+        message = json.dumps(spec_msg)
+        for i in range(0,len(message)):
+            if i == 1:
+                cmd.append(spec_msg[0])
+            elif i == 2:
+                continue
+            else:
+                cmd.append(ord(message[i]))
         self.sendMSG(bytes(cmd))
-        self.wait(200)
+        print(cmd)
+        self.wait(1500)
 
-    def getMsg(self,size):
+    def listening(self):
         self.setNormalMode()
-        msg = self.listenUART(size)
-        if msg != 0 :
-            mesg = ''
-            rssi = -(256 - msg[-1])
+        sta = self.listenUART(1)
+        if sta == b'[':
+            msg_size = self.listenUART(1)
+            msg = sta + self.listenUART(msg_size[0])
+
+            rssi = self.listenUART(1)
+            rssi_correct = -(256 - rssi[0])
+           # print("rssi", rssi_correct)
+            newmsg = ''
             for i in range(len(msg)):
-                mesg += chr(msg[i])
-            mesg = mesg[:-2] + ' RSSI:' + str(rssi) + 'dBm"'
-            m = json.loads(mesg)
+                newmsg += chr(msg[i])
+
+          #  print("msg =",msg)
+           # print("Newmsg =",newmsg)
+            decode_msg = json.loads(msg)
+            
+          #  print("decode_msg =",decode_msg)
+          #  print(decode_msg[0])
             self.wait(200)
-            return m
-        return 0
+            return decode_msg
